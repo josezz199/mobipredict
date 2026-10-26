@@ -1,0 +1,68 @@
+id_macrozona,municipio,macrozona,tipo,lat,lon
+1,Itagüí,Comuna 06,Urbano,6.16956,-75.63346
+2,Itagüí,Comuna 05,Urbano,6.17663,-75.61493
+3,Itagüí,Comuna 04,Urbano,6.18693,-75.59373
+4,Itagüí,Comuna 03,Urbano,6.18073,-75.60699
+5,Bello,Comuna 05,Urbano,6.34126,-75.56992
+6,Bello,Comuna 06,Urbano,6.35300,-75.56693
+7,Itagüí,Comuna 02,Urbano,6.16217,-75.62282
+8,Bello,Comuna 03,Urbano,6.32646,-75.56331
+9,Bello,Comuna 07,Urbano,6.34737,-75.55309
+10,Bello,Comuna 04,Urbano,6.33590,-75.55838
+11,Medellín,Robledo,Urbano,6.27886,-75.59252
+12,Medellín,El Poblado,Urbano,6.20169,-75.56458
+13,Medellín,Manrique,Urbano,6.27308,-75.54477
+14,Medellín,Guayabal,Urbano,6.21315,-75.58639
+15,Medellín,Buenos Aires,Urbano,6.23149,-75.55290
+16,Medellín,Belén,Urbano,6.22508,-75.59982
+17,Medellín,Aranjuez,Urbano,6.27620,-75.56157
+18,Medellín,La América,Urbano,6.25420,-75.60612
+19,Medellín,La Candelaria,Urbano,6.24772,-75.56808
+20,Medellín,Villa Hermosa,Urbano,6.24754,-75.54412
+21,Medellín,Laureles-Estadio,Urbano,6.25055,-75.59183
+22,Medellín,San Javier,Urbano,6.25931,-75.61557
+23,Itagüí,Comuna 01,Urbano,6.17002,-75.60852
+24,Caldas,Urbana Caldas,Urbano,6.07658,-75.63321
+25,La Estrella,Urbana La Estrella,Urbano,6.14300,-75.63781
+26,Barbosa,Urbana Barbosa,Urbano,6.43690,-75.33290
+27,Girardota,Urbana Girardota,Urbano,6.38089,-75.44330
+28,Bello,Comuna 02,Urbano,6.31737,-75.56136
+29,Bello,Comuna 10,Urbano,6.32892,-75.54260
+30,Medellín,Castilla,Urbano,6.29231,-75.56868
+31,Medellín,Popular,Urbano,6.29364,-75.54420
+32,Medellín,Doce de Octubre,Urbano,6.29932,-75.57920
+33,Medellín,Santa Cruz,Urbano,6.29842,-75.55453
+34,Bello,Comuna 11,Urbano,6.31478,-75.55032
+35,Copacabana,Urbana Copacabana,Urbano,6.34666,-75.50869
+36,Bello,Comuna 08,Urbano,6.34218,-75.54239
+37,Bello,Comuna 09,Urbano,6.34457,-75.52599
+38,Bello,Comuna 01,Urbano,6.31515,-75.58052
+39,Bello,Comuna 12,Urbano,6.30040,-75.53030
+40,Bello,Rural Bello,Rural,6.31460,-75.53806
+41,Barbosa,Rural Barbosa,Rural,6.44324,-75.32944
+42,Copacabana,Rural Copacabana,Rural,6.35223,-75.50019
+43,Girardota,Rural Girardota,Rural,6.38078,-75.44836
+44,Medellín,Corregimiento San Sebastián de Palmitas,Rural,6.32759,-75.68934
+45,Medellín,Corregimiento San Cristóbal,Rural,6.29073,-75.64056
+46,Medellín,Corregimiento Altavista,Rural,6.22731,-75.63531
+47,Medellín,Corregimiento Santa Elena,Rural,6.23482,-75.51665
+48,Medellín,Corregimiento San Antonio de Prado,Rural,6.21609,-75.67336
+49,Itagüí,Rural Itagüí,Rural,6.18766,-75.61716
+50,La Estrella,Rural La Estrella,Rural,6.12075,-75.62244
+51,Envigado,Zona 01,Urbano,6.17492,-75.59422
+52,Envigado,Zona 08,Urbano,6.16691,-75.59567
+53,Envigado,Zona 07,Urbano,6.15937,-75.59320
+54,Envigado,Zona 06,Urbano,6.15383,-75.58208
+55,Envigado,Zona 05,Urbano,6.16114,-75.57290
+56,Envigado,Zona 03,Urbano,6.17430,-75.57799
+57,Envigado,Zona 09,Urbano,6.17008,-75.58423
+58,Envigado,Zona 02,Urbano,6.17894,-75.58531
+59,Envigado,Zona 04,Urbano,6.17409,-75.56835
+60,Envigado,Rural 03,Rural,6.14641,-75.53229
+61,Envigado,Rural 01,Rural,6.14137,-75.55718
+62,Envigado,Rural 02,Rural,6.12489,-75.57265
+63,Envigado,Rural 04,Rural,6.17196,-75.51541
+64,Sabaneta,Urbana Sabaneta,Urbano,6.15197,-75.61651
+65,Sabaneta,Rural Sabaneta,Rural,6.13442,-75.60763
+66,Caldas,Rural Caldas,Rural,6.05397,-75.62707
+67,Sin especificar,Sin especificar,Ninguno,,

@@ -1,0 +1,13 @@
+__pycache__/
+*.pyc
+.venv/
+.ipynb_checkpoints/
+.pytest_cache/
+# Artefactos generados por el pipeline (se versionan con DVC o MLflow, no con Git)
+data/raw/*
+!data/raw/.gitkeep
+data/interim/
+data/processed/
+mlruns/
+models/*.joblib
+models/candidatos/

@@ -1,0 +1,14 @@
+.git
+.venv
+__pycache__
+*.pyc
+.ipynb_checkpoints
+.pytest_cache
+mlruns
+data/raw
+data/interim
+data/processed
+models/*.joblib
+models/candidatos
+eda/figures
+notebooks/*.ipynb

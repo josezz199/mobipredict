@@ -1,0 +1,63 @@
+# Uso:
+#   docker compose up --build            -> entrena (si no hay modelo) + API + MLflow UI
+#   docker compose --profile orquestacion up   -> además, Prefect UI en :4200
+#   RETRAIN=1 docker compose up trainer  -> fuerza un reentrenamiento
+x-app: &app
+  build: .
+  image: mobipredict:latest
+  volumes:
+    - ./data:/app/data
+    - ./models:/app/models
+    - ./mlruns:/app/mlruns
+    - ./eda:/app/eda
+    - ./docs:/app/docs
+
+services:
+  trainer:
+    <<: *app
+    container_name: mobipredict-trainer
+    environment:
+      - RETRAIN=${RETRAIN:-0}
+      - MOBIPREDICT_FAST=${MOBIPREDICT_FAST:-0}
+      - MOBIPREDICT_EOD_URL=${MOBIPREDICT_EOD_URL:-}
+      - MOBIPREDICT_SENSORS_URL=${MOBIPREDICT_SENSORS_URL:-}
+      - PREFECT_API_URL=${PREFECT_API_URL:-}
+    command: >
+      sh -c "if [ -f models/metadata.json ] && [ \"$$RETRAIN\" != \"1\" ];
+             then echo 'Modelo existente: se omite el entrenamiento (RETRAIN=1 para forzar)';
+             else python run_pipeline.py; fi"
+    restart: "no"
+
+  api:
+    <<: *app
+    container_name: mobipredict-api
+    ports:
+      - "8000:8000"
+    depends_on:
+      trainer:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  mlflow:
+    <<: *app
+    container_name: mobipredict-mlflow
+    ports:
+      - "5000:5000"
+    command: mlflow ui --backend-store-uri file:///app/mlruns --host 0.0.0.0 --port 5000
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:5000/health"]
+      interval: 30s
+      retries: 3
+    restart: unless-stopped
+
+  prefect:
+    <<: *app
+    container_name: mobipredict-prefect
+    profiles: ["orquestacion"]
+    ports:
+      - "4200:4200"
+    environment:
+      - PREFECT_SERVER_API_HOST=0.0.0.0
+      - PREFECT_UI_API_URL=http://localhost:4200/api
+    command: prefect server start --host 0.0.0.0 --port 4200
+    restart: unless-stopped
