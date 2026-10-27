@@ -145,12 +145,14 @@ def seleccionar(tabla: pd.DataFrame, spec: dict) -> dict:
         "modelo_velocidad": {"nombre": g_vel, "run_id": fv["run_id"], "registro": reg_v,
                              "test_mae_kmh": round(float(fv["test_mae"]), 3),
                              "test_rmse_kmh": round(float(fv["test_rmse"]), 3),
-                             "test_wape": round(float(fv["test_wape"]), 4)},
+                             "test_wape": round(float(fv["test_wape"]), 4), "razones": list(r_vel)},
         "modelo_colapso": {"nombre": g_col, "run_id": fc["run_id"], "registro": reg_c,
                            "umbral_decision": round(float(fc["umbral"]), 4),
                            "test_pr_auc": round(float(fc["test_pr_auc"]), 4),
                            "test_recall": round(float(fc["test_recall_colapso"]), 4),
-                           "test_precision": round(float(fc["test_precision_colapso"]), 4)},
+                           "test_precision": round(float(fc["test_precision_colapso"]), 4),
+                           "razones": list(r_col)},
+        "tasa_colapso": spec.get("tasa_colapso", {}), "filas": spec.get("filas", {}),
         "fuentes": {k: {"titulo": v.get("titulo"), "origen": v.get("origen"), "ficha": v.get("ficha")}
                     for k, v in manifest.get("fuentes", {}).items()},
     }

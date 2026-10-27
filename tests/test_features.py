@@ -37,7 +37,7 @@ def test_parser_fecha_y_agregacion_horaria(datos):
     assert len(dia) == 15
     # 6:00 (22.1) y 6:30 (15.3) se promedian
     assert dia.iloc[0]["velocidad_kmh"] == pytest.approx((22.1 + 15.3) / 2)
-    assert (sens["timestamp"].dt.dayofweek.isin([0, 1])).all()   # lunes y martes
+    assert (sens["timestamp"].dt.day_of_week.isin([0, 1])).all()   # lunes y martes
 
 
 def test_rezagos_no_cruzan_la_noche(datos):

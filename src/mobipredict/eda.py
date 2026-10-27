@@ -87,7 +87,7 @@ def _datos() -> dict:
 
 
 def _laborable_pre(s: pd.DataFrame, festivos: set) -> pd.DataFrame:
-    return s[(s["timestamp"] < pd.Timestamp(config.FIN_TEST)) & (s["timestamp"].dt.dayofweek < 5)
+    return s[(s["timestamp"] < pd.Timestamp(config.FIN_TEST)) & (s["timestamp"].dt.day_of_week < 5)
              & ~s["timestamp"].dt.normalize().isin(festivos)]
 
 
@@ -103,7 +103,11 @@ def fig_congestion(D) -> tuple[str, pd.DataFrame]:
     ax.set_xticks(range(piv.shape[1]), [f"{h:02d}h" for h in piv.columns])
     ax.set_yticks(range(len(piv)), piv.index, fontsize=8.5)
     ax.grid(False)
-    ax.set_title("Congestión crónica: picos de 7 h y 18 h, peores en vías interrumpidas")
+    perfil_h = piv.mean(axis=0)
+    h_man = int(perfil_h[perfil_h.index < 12].idxmax()) if (perfil_h.index < 12).any() else None
+    h_tar = int(perfil_h[perfil_h.index >= 12].idxmax()) if (perfil_h.index >= 12).any() else None
+    picos = " y ".join(f"{h} h" for h in [h_man, h_tar] if h is not None)
+    ax.set_title(f"Congestión crónica: picos a las {picos} (más oscuro = más lento que lo normal)")
     ax.set_xlabel("Hora (días laborables, feb-2017 a mar-2020)")
     cb = fig.colorbar(im, ax=ax, fraction=0.03, pad=0.01)
     cb.set_label("Índice de congestión = 1 − vel / vel de referencia (p95)", color=TINTA_2)

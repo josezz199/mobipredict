@@ -36,7 +36,7 @@ PASO = pd.Timedelta(minutes=config.FREQ_MIN)
 # Tablas de referencia
 # --------------------------------------------------------------------------- #
 def _tipo_dia(ts: pd.Series, festivo: pd.Series) -> np.ndarray:
-    dow = ts.dt.dayofweek
+    dow = ts.dt.day_of_week
     return np.select([(festivo == 1) | (dow == 6), dow == 5], ["domingo_festivo", "sabado"], "laboral")
 
 
@@ -99,7 +99,7 @@ def construir_features(d: pd.DataFrame, store: dict) -> pd.DataFrame:
 
     h = d["hora"]
     d["hora_sin"], d["hora_cos"] = np.sin(2 * np.pi * h / 24), np.cos(2 * np.pi * h / 24)
-    dow = d["timestamp"].dt.dayofweek
+    dow = d["timestamp"].dt.day_of_week
     d["dow_sin"], d["dow_cos"] = np.sin(2 * np.pi * dow / 7), np.cos(2 * np.pi * dow / 7)
     d["es_fin_semana"] = (dow >= 5).astype(int)
     d["es_pico"] = h.isin([6, 7, 8, 17, 18, 19]).astype(int)
@@ -189,6 +189,10 @@ def preparar_dataset() -> dict:
         d[d["particion"] == part].to_parquet(config.DATA_PROCESSED / f"{part}.parquet", index=False)
 
     joblib.dump(store, config.FEATURE_STORE_FILE)
+    try:   # escenarios reales para el frontend (no afecta el entrenamiento)
+        exportar_escenarios(sens, clima, store)
+    except Exception as exc:  # noqa: BLE001
+        log.warning("No se pudieron generar los escenarios del frontend: %s", exc)
     spec = {
         "fuente_sensores": config.FUENTES["velocidad_gt"]["titulo"],
         "features": FEATURES_NUM, "target_regresion": TARGET_REG, "target_clasificacion": TARGET_CLF,
@@ -204,6 +208,102 @@ def preparar_dataset() -> dict:
                                                              encoding="utf-8")
     log.info("Dataset listo: %s | tasa de colapso: %s", spec["filas"], spec["tasa_colapso"])
     return spec
+
+
+def _secuencias(sens: pd.DataFrame, t: pd.Timestamp, vref: pd.Series, lluvia: pd.Series,
+                n_hist: int = 6) -> list[dict]:
+    """Para cada tramo: hasta `n_hist` lecturas consecutivas que terminan en t + la velocidad real en t + 1 h."""
+    t_obj = t + config.HORIZON_STEPS * PASO
+    ventana = sens[(sens["timestamp"] > t - n_hist * PASO) & (sens["timestamp"] <= t_obj)]
+    out = []
+    for tramo, g in ventana.groupby("tramo_id"):
+        g = g.set_index("timestamp")["velocidad_kmh"]
+        if t not in g.index or t_obj not in g.index or tramo not in vref.index:
+            continue
+        hist = g[g.index <= t]
+        # solo el tramo final de lecturas consecutivas (sin huecos)
+        consecutivas = [t]
+        while consecutivas[-1] - PASO in hist.index and len(consecutivas) < n_hist:
+            consecutivas.append(consecutivas[-1] - PASO)
+        if len(consecutivas) < config.MIN_HISTORY:
+            continue
+        obs = [{"timestamp": ts.isoformat(), "velocidad_kmh": round(float(hist[ts]), 1),
+                "lluvia_mm": round(float(lluvia.get(ts, 0.0)), 1)} for ts in sorted(consecutivas)]
+        real = float(g[t_obj])
+        out.append({"tramo_id": tramo, "observaciones": obs, "velocidad_real_kmh": round(real, 1),
+                    "colapso_real": bool(real / float(vref[tramo]) < config.COLLAPSE_SPEED_RATIO)})
+    return out
+
+
+def exportar_escenarios(sens: pd.DataFrame, clima: pd.DataFrame, store: dict) -> list[dict]:
+    """Momentos reales del periodo de PRUEBA (y uno de la pandemia) para el frontend.
+
+    Cada escenario trae, para cada tramo con datos, las últimas lecturas horarias hasta la hora t y la
+    velocidad que realmente se midió en t + 1 h, para comparar la predicción con lo que pasó.
+    """
+    vref = store["tramos"].set_index("tramo_id")["vel_referencia_kmh"].dropna()
+    lluvia = clima.set_index("timestamp")["lluvia_mm"].fillna(0)
+    lluvia = lluvia[~lluvia.index.duplicated()]
+    fest = store["festivos"]
+    c_test, fin_test = pd.Timestamp(config.CORTE_TEST), pd.Timestamp(config.FIN_TEST)
+    fin_drift = pd.Timestamp(config.FIN_DRIFT)
+
+    def candidatos(ini, fin):
+        s = sens[(sens["timestamp"] >= ini) & (sens["timestamp"] < fin)]
+        s = s[(s["timestamp"].dt.day_of_week < 5) & ~s["timestamp"].dt.normalize().isin(fest)]
+        return s.groupby("timestamp")["tramo_id"].nunique()
+
+    def elegir(cob: pd.Series, horas: list[int]) -> pd.Timestamp | None:
+        c = cob[cob.index.hour.isin(horas)]
+        if c.empty:
+            return None
+        return c[c >= c.max() * 0.9].index.max()      # el más reciente con buena cobertura
+
+    # Se evitan las 3 semanas previas a la cuarentena (colegios cerrados desde el 16-mar-2020)
+    fin_normal = fin_test - pd.Timedelta(days=21)
+    cob_test = candidatos(c_test, fin_normal)
+    elegidos: list[tuple[str, str, pd.Timestamp | None]] = [
+        ("manana", "Media mañana", elegir(cob_test, [9, 10])),
+        ("mediodia", "Mediodía", elegir(cob_test, [12])),
+        ("tarde", "Inicio del pico de la tarde", elegir(cob_test, [16])),
+        ("pico", "Pico de la tarde", elegir(cob_test, [17])),
+    ]
+    # Tarde con más lluvia dentro del periodo de prueba
+    pico = cob_test[cob_test.index.hour.isin([15, 16, 17, 18]) & (cob_test >= cob_test.max() * 0.7)]
+    if len(pico):
+        ll = lluvia.reindex(pico.index).fillna(0)
+        if ll.max() > 0:
+            elegidos.append(("lluvia", f"Tarde con lluvia ({ll.max():.1f} mm)", ll.idxmax()))
+    # Hora con más colapsos reales en la hora siguiente
+    s_test = sens[(sens["timestamp"] >= c_test) & (sens["timestamp"] < fin_normal)].join(vref, on="tramo_id")
+    s_test = s_test[s_test["velocidad_kmh"] / s_test["vel_referencia_kmh"] < config.COLLAPSE_SPEED_RATIO]
+    if len(s_test):
+        peor = s_test.groupby("timestamp")["tramo_id"].nunique()
+        peor = peor[peor.index.hour >= 10]
+        if len(peor):
+            elegidos.append(("colapsos", "Hora previa a más colapsos", peor.idxmax() - config.HORIZON_STEPS * PASO))
+    # Un momento de la cuarentena estricta (abril-mayo de 2020), fuera de lo que vio el modelo
+    elegidos.append(("pandemia", "Cuarentena 2020: pico de la tarde",
+                     elegir(candidatos(fin_test + pd.Timedelta(days=14), min(fin_test + pd.Timedelta(days=70), fin_drift)),
+                            [17])))
+
+    escenarios, vistos = [], set()
+    for clave, nombre, t in elegidos:
+        if t is None or t in vistos:
+            continue
+        tramos = _secuencias(sens, t, vref, lluvia)
+        if not tramos:
+            continue
+        vistos.add(t)
+        escenarios.append({
+            "id": clave, "nombre": nombre, "timestamp": t.isoformat(),
+            "timestamp_prediccion": (t + config.HORIZON_STEPS * PASO).isoformat(),
+            "periodo": "drift" if t >= fin_test else "test",
+            "tramos": tramos,
+        })
+    config.ESCENARIOS_FILE.write_text(json.dumps(escenarios, ensure_ascii=False), encoding="utf-8")
+    log.info("Escenarios para el frontend: %s", [(e["id"], e["timestamp"], len(e["tramos"])) for e in escenarios])
+    return escenarios
 
 
 def cargar_particiones() -> dict[str, pd.DataFrame]:

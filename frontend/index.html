@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MobiPredict · Riesgo vial a una hora</title>
+  <meta name="description" content="Pronóstico de velocidad y alertas de colapso por corredor vial en Medellín, con datos abiertos.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Semi+Condensed:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="barra">
+    <a class="marca" href="#prediccion">
+      <svg class="marca-icono" viewBox="0 0 32 32" aria-hidden="true">
+        <rect x="1" y="1" width="30" height="30" rx="7" fill="var(--asfalto)"/>
+        <path d="M9 25 L14 7 M23 25 L18 7" stroke="var(--linea)" stroke-width="2.2" stroke-linecap="round"/>
+        <path d="M16 23v-2.5M16 17v-2.5M16 11V9" stroke="var(--senal)" stroke-width="2.2" stroke-linecap="round"/>
+      </svg>
+      <span>MobiPredict</span>
+    </a>
+    <nav class="menu" aria-label="Secciones">
+      <a href="#prediccion">Predicción</a>
+      <a href="#modelos">Modelos</a>
+      <a href="#analisis">Análisis de datos</a>
+      <a href="/docs" target="_blank" rel="noopener">API</a>
+    </nav>
+    <p id="estado" class="estado" role="status">Conectando con la API…</p>
+  </header>
+
+  <main>
+    <!-- ============ PREDICCIÓN ============ -->
+    <section id="prediccion" class="seccion">
+      <div class="intro">
+        <h1>¿Qué vías de Medellín van a colapsar en la próxima hora?</h1>
+        <p class="bajada">Elige un momento real medido por los sensores de la Secretaría de Movilidad. El modelo predice cada corredor una hora adelante y lo compara con lo que de verdad pasó.</p>
+      </div>
+
+      <div id="sin-modelos" class="aviso" hidden>
+        <h2>Aún no hay modelos entrenados</h2>
+        <p>Ejecuta <code>python run_pipeline.py</code> (o <code>python run_pipeline.py --fast</code>) en la carpeta del proyecto y luego recarga esta página.</p>
+        <p class="detalle" id="sin-modelos-detalle"></p>
+      </div>
+
+      <div id="tablero" class="tablero" hidden>
+        <div class="momentos" role="tablist" aria-label="Momento a simular" id="momentos"></div>
+
+        <div class="resumen" id="resumen" aria-live="polite"></div>
+
+        <div class="cuerpo">
+          <div class="vias">
+            <div class="vias-cabecera" aria-hidden="true">
+              <span>Corredor</span>
+              <span>Velocidad ahora y en 1 hora</span>
+              <span>Riesgo</span>
+            </div>
+            <ol class="lista-vias" id="lista-vias"></ol>
+            <p class="leyenda">
+              <span class="ley ley-ahora"></span> ahora
+              <span class="ley ley-pred"></span> predicción a 1 h
+              <span class="ley ley-real"></span> lo que pasó
+              <span class="ley ley-umbral"></span> umbral de colapso (50 % de la velocidad normal)
+            </p>
+          </div>
+
+          <aside class="detalle-via" id="detalle" aria-live="polite">
+            <p class="vacio">Selecciona un corredor para ver su detalle y probar otros valores.</p>
+          </aside>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ MODELOS ============ -->
+    <section id="modelos" class="seccion">
+      <h2>Cómo se eligió el modelo</h2>
+      <p class="bajada">Se entrenaron varios candidatos para cada tarea y se eligió el ganador con reglas fijadas antes de ver los resultados. La prueba usa datos que el modelo nunca vio; la pandemia mide qué tanto se degrada cuando el mundo cambia.</p>
+      <div id="ganadores" class="ganadores"></div>
+      <div class="tablas-modelos">
+        <div>
+          <h3>Velocidad a 1 hora</h3>
+          <div class="tabla-scroll"><table id="tabla-velocidad" class="tabla"></table></div>
+        </div>
+        <div>
+          <h3>Colapso a 1 hora</h3>
+          <div class="tabla-scroll"><table id="tabla-colapso" class="tabla"></table></div>
+        </div>
+      </div>
+      <p class="nota">Detalle completo en <code>docs/model_decision.md</code> y en MLflow (<code>mlflow ui</code>, puerto 5000).</p>
+    </section>
+
+    <!-- ============ EDA ============ -->
+    <section id="analisis" class="seccion">
+      <h2>Lo que muestran los datos</h2>
+      <p class="bajada">Los nueve gráficos del análisis exploratorio, generados con las fuentes oficiales.</p>
+      <div id="galeria" class="galeria"></div>
+    </section>
+  </main>
+
+  <footer class="pie">
+    <p>Datos: MEData (Velocidad y tiempo de viaje GT, Aforos), Encuesta Origen-Destino 2025 del AMVA, Open-Meteo (ERA5) y Mendeley Data (siniestralidad 2008-2025). Proyecto académico; no es un servicio oficial de la Alcaldía.</p>
+  </footer>
+
+  <dialog id="visor" class="visor">
+    <form method="dialog"><button class="cerrar" aria-label="Cerrar">×</button></form>
+    <img id="visor-img" alt="">
+    <p id="visor-texto"></p>
+  </dialog>
+
+  <script src="app.js"></script>
+</body>
+</html>

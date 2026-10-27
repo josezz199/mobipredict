@@ -1,12 +1,17 @@
 """API de predicción de MobiPredict (FastAPI).
 
 Endpoints:
-  GET  /health        estado del servicio y de los modelos cargados
-  GET  /tramos        catálogo de corredores disponibles
-  POST /predict       velocidad a 1 hora + probabilidad y alerta de colapso para un tramo
-  POST /predict/batch varias peticiones en una sola llamada
+  GET  /                  redirige al frontend web (/app/)
+  GET  /health            estado del servicio y de los modelos cargados
+  GET  /tramos            catálogo de corredores disponibles
+  GET  /escenarios        momentos reales del periodo de prueba (para el frontend)
+  GET  /escenarios/{id}   lecturas de todos los tramos en ese momento + lo que pasó en la hora siguiente
+  GET  /modelos           modelos ganadores y comparación de todos los candidatos
+  POST /predict           velocidad a 1 hora + probabilidad y alerta de colapso para un tramo
+  POST /predict/batch     varias peticiones en una sola llamada
 
 Arranque local:  uvicorn api.main:app --reload --port 8000
+Frontend:        http://localhost:8000/
 Documentación interactiva: http://localhost:8000/docs
 """
 from __future__ import annotations
@@ -20,6 +25,8 @@ from pathlib import Path
 import joblib
 import pandas as pd
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import RedirectResponse
+from fastapi.staticfiles import StaticFiles
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
@@ -46,6 +53,9 @@ def cargar_modelos() -> None:
         modelo_colapso=joblib.load(config.MODEL_COLLAPSE_FILE),
         store=joblib.load(config.FEATURE_STORE_FILE),
         meta=json.loads(config.METADATA_FILE.read_text(encoding="utf-8")),
+        escenarios=(json.loads(config.ESCENARIOS_FILE.read_text(encoding="utf-8"))
+                    if config.ESCENARIOS_FILE.exists() else []),
+        comparacion=(pd.read_csv(config.COMPARISON_FILE) if config.COMPARISON_FILE.exists() else None),
         cargado_en=time.strftime("%Y-%m-%dT%H:%M:%S"),
     )
 
@@ -63,6 +73,17 @@ app = FastAPI(
     version="1.0.0",
     lifespan=lifespan,
 )
+
+# Frontend web y figuras del EDA (archivos estáticos servidos por la misma API)
+if config.FRONTEND_DIR.exists():
+    app.mount("/app", StaticFiles(directory=config.FRONTEND_DIR, html=True), name="frontend")
+config.EDA_FIGURES.mkdir(parents=True, exist_ok=True)
+app.mount("/figuras", StaticFiles(directory=config.EDA_FIGURES), name="figuras")
+
+
+@app.get("/", include_in_schema=False)
+def inicio() -> RedirectResponse:
+    return RedirectResponse(url="/app/" if config.FRONTEND_DIR.exists() else "/docs")
 
 
 def _requiere_modelos() -> None:
@@ -143,6 +164,42 @@ def predict_batch(req: PredictBatchRequest) -> PredictBatchResponse:
     _requiere_modelos()
     preds = [_predecir(r) for r in req.peticiones]
     return PredictBatchResponse(predicciones=preds, alertas=sum(p.alerta_colapso for p in preds))
+
+
+@app.get("/escenarios", tags=["frontend"])
+def escenarios() -> list[dict]:
+    """Momentos reales del periodo de prueba (y uno de la pandemia) disponibles para simular."""
+    _requiere_modelos()
+    return [{k: e[k] for k in ["id", "nombre", "timestamp", "timestamp_prediccion", "periodo"]}
+            | {"tramos": len(e["tramos"]), "colapsos_reales": sum(t["colapso_real"] for t in e["tramos"])}
+            for e in ESTADO["escenarios"]]
+
+
+@app.get("/escenarios/{escenario_id}", tags=["frontend"])
+def escenario(escenario_id: str) -> dict:
+    """Lecturas reales de cada tramo hasta la hora t y la velocidad medida en t + 1 h."""
+    _requiere_modelos()
+    for e in ESTADO["escenarios"]:
+        if e["id"] == escenario_id:
+            return e
+    raise HTTPException(status_code=404, detail=f"Escenario desconocido: {escenario_id}")
+
+
+@app.get("/modelos", tags=["frontend"])
+def modelos() -> dict:
+    """Modelos ganadores, reglas de decisión y métricas de todos los candidatos."""
+    _requiere_modelos()
+    meta = ESTADO["meta"]
+    filas = []
+    comp = ESTADO.get("comparacion")
+    if comp is not None:
+        cols = [c for c in comp.columns if c not in ("params", "run_id")]
+        filas = json.loads(comp[cols].to_json(orient="records"))   # NaN -> null, tipos nativos
+    return {"generado_utc": meta.get("generado_utc"), "horizonte_min": meta.get("horizonte_min"),
+            "umbral_colapso_ratio_vel": meta.get("umbral_colapso_ratio_vel"),
+            "modelo_velocidad": meta.get("modelo_velocidad"), "modelo_colapso": meta.get("modelo_colapso"),
+            "n_features": len(meta.get("features", [])), "comparacion": filas,
+            "figuras": sorted(p.name for p in config.EDA_FIGURES.glob("*.png"))}
 
 
 @app.post("/admin/reload", tags=["estado"])

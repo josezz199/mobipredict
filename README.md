@@ -3,9 +3,13 @@
 Flujo MLOps de extremo a extremo que pronostica la **velocidad de los corredores viales de Medellín a 1 hora**, emite **alertas tempranas de colapso** y caracteriza la **demanda y la densidad de viajes** con la **Encuesta Origen-Destino 2025 (AMVA)**. Todo con datos abiertos y reales; no hay datos simulados.
 
 ```
-Fuentes oficiales ─► Estandarización ─► EDA ─► Features + split temporal ─► Entrenamiento + Optuna ─► MLflow ─► Selección ─► API
-(data/raw)          (data/interim)     (eda/)   (data/processed)             (RandomizedSearchCV)       (mlruns/)  (models/, docs/) (FastAPI)
+Fuentes oficiales ─► Estandarización ─► EDA ─► Features + split temporal ─► Entrenamiento + Optuna ─► MLflow ─► Selección ─► API + Frontend
+(data/raw)          (data/interim)     (eda/)   (data/processed)             (RandomizedSearchCV)       (mlruns/)  (models/, docs/) (FastAPI, :8000)
 ```
+
+> ¿Primera vez? Empieza por **[LEEME_PRIMERO.md](LEEME_PRIMERO.md)**: guía simple con todos los pasos para ejecutarlo en Windows.
+>
+> Informe técnico completo (cómo funciona cada etapa, cómo se construyeron los datos, decisiones y limitaciones): **[README_DETALLADO.md](README_DETALLADO.md)**.
 
 Orquestado con **Prefect** y ejecutable con un comando:
 
@@ -31,11 +35,11 @@ python run_pipeline.py
 
 ## Inicio rápido
 
-Requisitos: Python 3.11-3.13 y conexión a internet para la primera descarga (~175 MB).
+Requisitos: Python 3.11-3.13 (probado con 3.12) y conexión a internet para la primera descarga (~175 MB).
 
 ```bash
-python -m venv .venv
-.venv\Scripts\activate             # Windows  (Linux/Mac: source .venv/bin/activate)
+py -3.12 -m venv .venv             # Windows   (Linux/Mac: python3 -m venv .venv)
+source .venv/Scripts/activate      # Git Bash  (PowerShell: .venv\Scripts\Activate.ps1 · Linux/Mac: source .venv/bin/activate)
 pip install -r requirements-dev.txt
 
 # 1) Descargar las fuentes reales a data/raw/ (cualquiera de las dos)
@@ -46,8 +50,8 @@ powershell -ExecutionPolicy Bypass -File scripts\descargar_datos.ps1
 python run_pipeline.py             # completo (~15-25 min)
 python run_pipeline.py --fast      # menos trials de búsqueda (~5 min)
 
-# 3) Servicio y seguimiento
-uvicorn api.main:app --port 8000                                                    # http://localhost:8000/docs
+# 3) Frontend + API y seguimiento
+uvicorn api.main:app --port 8000                                                    # frontend: http://localhost:8000  ·  API: /docs
 set MLFLOW_ALLOW_FILE_STORE=true && mlflow ui --backend-store-uri ./mlruns --port 5000   # http://localhost:5000
 ```
 
@@ -71,7 +75,8 @@ mobipredict/
 │   ├── training.py                 # Candidatos, RandomizedSearchCV/Optuna, MLflow
 │   ├── selection.py                # Reglas de selección, comparación, decisión
 │   └── pipeline.py                 # @flow y @task de Prefect
-├── api/                            # FastAPI: /health, /tramos, /predict, /predict/batch
+├── api/                            # FastAPI: /health, /tramos, /predict, /escenarios, /modelos…
+├── frontend/                       # Página web (HTML/CSS/JS sin dependencias) servida en /
 ├── tests/                          # Pruebas con un extracto real (fixtures/)
 ├── notebooks/MobiPredict_MLOps_end_to_end.ipynb
 ├── data/
@@ -149,6 +154,10 @@ Salidas: `models/model_comparison.csv` y `docs/model_decision.md`. Este último 
 | GET | `/tramos` | Los 22 tramos con su `tramo_id` |
 | POST | `/predict` | Velocidad y tiempo de viaje a 1 h, probabilidad y alerta de colapso |
 | POST | `/predict/batch` | Hasta 500 peticiones |
+| GET | `/escenarios` | Momentos reales del periodo de prueba (y uno de la cuarentena) |
+| GET | `/escenarios/{id}` | Lecturas de cada tramo hasta la hora t y la velocidad medida en t + 1 h |
+| GET | `/modelos` | Ganadores, razones de la selección y métricas de todos los candidatos |
+| GET | `/figuras/{archivo}` | Figuras del EDA |
 | POST | `/admin/reload` | Recarga modelos tras reentrenar |
 
 ```bash
@@ -164,11 +173,22 @@ curl -X POST http://localhost:8000/predict -H "Content-Type: application/json" -
 
 La respuesta trae `velocidad_predicha_kmh`, `tiempo_viaje_predicho_min`, `probabilidad_colapso`, `alerta_colapso` y `nivel` (`normal`, `precaucion` o `colapso`).
 
+## Frontend
+
+Al encender la API, **http://localhost:8000** abre la aplicación web (no requiere instalar nada más):
+
+- **Predicción:** eliges un momento real del periodo de prueba (mediodía, pico de la tarde, tarde con lluvia, la hora con más colapsos o la cuarentena de 2020). El modelo predice las 22 vías una hora adelante y lo compara con lo que de verdad se midió: alertas, aciertos y error medio.
+- **Detalle por vía:** gráfico de las últimas horas, predicción y valor real, probabilidad de colapso frente al umbral, y un formulario para probar otros valores de velocidad o lluvia.
+- **Modelos:** ganadores, razones de la selección y tabla comparativa de todos los candidatos (prueba y pandemia).
+- **Análisis de datos:** los 9 gráficos del EDA.
+
+Los momentos reales se generan en el pipeline (`models/escenarios.json`). Si no existen, el frontend pasa a modo manual.
+
 ## Docker
 
 ```bash
 python scripts/descargar_datos.py        # o el .ps1; los datos se montan como volumen
-docker compose up --build                # trainer -> API (:8000) + MLflow UI (:5000)
+docker compose up --build                # trainer -> frontend + API (:8000) + MLflow UI (:5000)
 docker compose --profile orquestacion up # + Prefect UI (:4200)
 RETRAIN=1 docker compose up trainer      # reentrenar
 ```
@@ -180,7 +200,8 @@ pytest -q tests
 ```
 
 - `test_features.py` corre sobre un extracto real (Av. 80 y Autopista Sur, 10-11 feb 2020). Verifica el parser de fechas, la agregación horaria, que los rezagos no crucen la noche, que no haya fuga en los targets y que las features de la API sean idénticas a las de entrenamiento.
-- `test_api.py` prueba los endpoints una vez entrenados los modelos.
+- `test_fuentes.py` verifica que se lea el Excel de datos de siniestralidad (y no el diccionario que viene en el mismo ZIP).
+- `test_api.py` prueba los endpoints, el frontend y los escenarios una vez entrenados los modelos.
 
 ## Limitaciones
 

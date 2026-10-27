@@ -6,8 +6,8 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-# Lecturas horarias reales del tramo AVENIDA_80_NS (MEData/SIMM). Se reemplazan al correr el pipeline
-# por un ejemplo tomado del conjunto de prueba (ver models/ejemplo_api.json).
+# Ejemplo de petición para /docs. Lecturas reales de cada tramo en momentos del periodo de prueba:
+# GET /escenarios y GET /escenarios/{id} (models/escenarios.json, generado por el pipeline).
 EJEMPLO_TRAMO = "AVENIDA_80_NS"
 EJEMPLO_OBS = [
     {"timestamp": "2020-02-11T14:00:00", "velocidad_kmh": 24.0, "lluvia_mm": 0.0},

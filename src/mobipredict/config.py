@@ -142,6 +142,8 @@ MODEL_COLLAPSE_FILE = MODELS_DIR / "modelo_colapso.joblib"
 FEATURE_STORE_FILE = MODELS_DIR / "feature_store.joblib"
 METADATA_FILE = MODELS_DIR / "metadata.json"
 COMPARISON_FILE = MODELS_DIR / "model_comparison.csv"
+ESCENARIOS_FILE = MODELS_DIR / "escenarios.json"       # momentos reales del periodo de prueba (frontend)
+FRONTEND_DIR = ROOT / "frontend"
 DECISION_FILE = DOCS_DIR / "model_decision.md"
 
 

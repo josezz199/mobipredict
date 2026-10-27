@@ -19,8 +19,7 @@ services:
     environment:
       - RETRAIN=${RETRAIN:-0}
       - MOBIPREDICT_FAST=${MOBIPREDICT_FAST:-0}
-      - MOBIPREDICT_EOD_URL=${MOBIPREDICT_EOD_URL:-}
-      - MOBIPREDICT_SENSORS_URL=${MOBIPREDICT_SENSORS_URL:-}
+      - MOBIPREDICT_EOD_API=${MOBIPREDICT_EOD_API:-https://eod2025.metropol.gov.co/api/api}
       - PREFECT_API_URL=${PREFECT_API_URL:-}
     command: >
       sh -c "if [ -f models/metadata.json ] && [ \"$$RETRAIN\" != \"1\" ];

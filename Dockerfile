@@ -18,6 +18,7 @@ RUN pip install --upgrade pip && pip install -r requirements.txt
 
 COPY src/ src/
 COPY api/ api/
+COPY frontend/ frontend/
 COPY tests/ tests/
 COPY run_pipeline.py .
 COPY data/reference/ data/reference/

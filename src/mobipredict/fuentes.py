@@ -12,6 +12,7 @@ import logging
 import re
 import unicodedata
 import zipfile
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -56,7 +57,7 @@ def leer_velocidad_gt(ruta) -> pd.DataFrame:
     raw["timestamp_raw"] = pd.to_datetime(raw["fecha_hora"].astype(str).str.strip(), format="%d/%m/%Y %H:%M",
                                           errors="coerce")
     raw = raw.dropna(subset=["timestamp_raw", "velocidad_kmh"])
-    incoherentes = raw["timestamp_raw"].dt.dayofweek + 1 != raw["diasem"]
+    incoherentes = raw["timestamp_raw"].dt.day_of_week + 1 != raw["diasem"]
     if incoherentes.any():
         log.warning("Sensores: %d filas con FECHA_HORA incoherente con DIASEM; se descartan", incoherentes.sum())
         raw = raw[~incoherentes]
@@ -185,9 +186,16 @@ def estandarizar_siniestros() -> pd.DataFrame | None:
     if config.SINIESTROS_STD.exists() and config.SINIESTROS_STD.stat().st_mtime > z.stat().st_mtime:
         return pd.read_parquet(config.SINIESTROS_STD)
     with zipfile.ZipFile(z) as zf:
-        nombre = next(n for n in zf.namelist() if n.endswith("Fatal_Road_Traffic.xlsx"))
+        # El ZIP trae dos Excel que terminan igual: Fatal_Road_Traffic.xlsx (datos) y
+        # Data_Dictionary_Fatal_Road_Traffic.xlsx (diccionario). Se elige por nombre EXACTO.
+        candidatos = [n for n in zf.namelist() if Path(n).name == "Fatal_Road_Traffic.xlsx"]
+        if not candidatos:
+            raise ValueError(f"Siniestros: no se encontró Fatal_Road_Traffic.xlsx en el ZIP ({zf.namelist()})")
+        nombre = candidatos[0]
         log.info("Siniestros: leyendo %s (puede tardar unos minutos)", nombre)
-        df = pd.read_excel(io.BytesIO(zf.read(nombre)), sheet_name="BD", engine="openpyxl")
+        xls = pd.ExcelFile(io.BytesIO(zf.read(nombre)), engine="openpyxl")
+        hoja = "BD" if "BD" in xls.sheet_names else xls.sheet_names[0]
+        df = pd.read_excel(xls, sheet_name=hoja)
     df.columns = [_norm(c) for c in df.columns]
     col = lambda *ops: next((c for c in df.columns if any(o == c or o in c for o in ops)), None)  # noqa: E731
     out = pd.DataFrame({
@@ -227,14 +235,23 @@ def estandarizar_aforos() -> pd.DataFrame | None:
     return comp
 
 
+def _opcional(nombre: str, fn):
+    """Fuentes opcionales (solo EDA): si fallan, se avisa y el proceso continúa sin ellas."""
+    try:
+        return fn()
+    except Exception as exc:
+        log.warning("Fuente opcional '%s' no se pudo procesar y se omite: %s", nombre, exc)
+        return None
+
+
 def estandarizar_todo() -> dict:
     config.ensure_dirs()
     sens, tramos = estandarizar_sensores()
     clima = estandarizar_clima()
     fest = estandarizar_festivos()
     horas, od = estandarizar_eod()
-    sin = estandarizar_siniestros()
-    afo = estandarizar_aforos()
+    sin = _opcional("siniestros", estandarizar_siniestros)
+    afo = _opcional("aforos", estandarizar_aforos)
     resumen = {
         "sensores_filas": len(sens), "tramos": len(tramos),
         "periodo_sensores": [str(sens["timestamp"].min()), str(sens["timestamp"].max())],

@@ -47,3 +47,35 @@ def test_predict_batch(client):
     r = client.post("/predict/batch", json={"peticiones": [{"tramo_id": t, "observaciones": EJEMPLO_OBS} for t in ids]})
     assert r.status_code == 200
     assert len(r.json()["predicciones"]) == len(ids)
+
+
+def test_frontend_y_raiz(client):
+    r = client.get("/", follow_redirects=False)
+    assert r.status_code in (302, 307) and r.headers["location"].endswith("/app/")
+    r = client.get("/app/")
+    assert r.status_code == 200 and "MobiPredict" in r.text
+    for archivo in ["app.js", "styles.css"]:
+        assert client.get(f"/app/{archivo}").status_code == 200
+
+
+def test_modelos(client):
+    r = client.get("/modelos")
+    assert r.status_code == 200
+    b = r.json()
+    assert b["modelo_velocidad"]["nombre"] and b["modelo_colapso"]["nombre"]
+    tareas = {f["tarea"] for f in b["comparacion"]}
+    assert tareas == {"velocidad", "colapso"}
+    assert sum(f["seleccionado"] for f in b["comparacion"]) == 2
+
+
+def test_escenarios_predicen(client):
+    lista = client.get("/escenarios").json()
+    if not lista:
+        pytest.skip("sin escenarios (models/escenarios.json)")
+    e = client.get(f"/escenarios/{lista[0]['id']}").json()
+    assert e["tramos"] and all(len(t["observaciones"]) >= 4 for t in e["tramos"])
+    pet = [{"tramo_id": t["tramo_id"], "observaciones": t["observaciones"]} for t in e["tramos"]]
+    r = client.post("/predict/batch", json={"peticiones": pet})
+    assert r.status_code == 200, r.text
+    assert len(r.json()["predicciones"]) == len(pet)
+    assert client.get("/escenarios/no-existe").status_code == 404

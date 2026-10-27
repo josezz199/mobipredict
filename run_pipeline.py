@@ -25,6 +25,7 @@ def main() -> None:
     p.add_argument("--skip-eda", action="store_true", help="no ejecutar el EDA")
     p.add_argument("--descargar", action="store_true", help="forzar nueva descarga de las fuentes")
     a = p.parse_args()
+    os.environ.setdefault("PREFECT_SERVER_ANALYTICS_ENABLED", "false")   # sin telemetría de Prefect
     if a.fast:
         os.environ["MOBIPREDICT_FAST"] = "1"   # debe fijarse antes de importar config
 
